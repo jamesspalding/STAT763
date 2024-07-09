@@ -1,0 +1,145 @@
+---
+title: "Nutrient Intake Report"
+author: "James Spalding, Andrew Spika, Lucas Steltenpohl"
+date: "2024-04-24"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F)
+library(tidyverse)
+```
+
+## Introduction
+
+The goal of our analysis is to determine if the population of women in the United States meet the recommended intake for all of the following vitamins: calcium, iron, protein, vitamin A, and vitamin C. The table below, provided by federal health authorities, details amounts of each vitamin's daily recommended consumption:
+
+| **Vitamin** 	| **Daily Recommended Intake** 	|
+|-------------	|------------------------------	|
+| Calcium     	|           1000 mg            |
+| Iron        	|           15 mg               |
+| Protein     	|           60 g              	|
+| Vitamin A   	|           800 $\mu$g        	|
+| Vitamin C   	|           75 mg             	|
+
+The response used in this study consists of daily nutrient intakes for the five different nutrients in a random sample of 737 US women between the ages of 25 and 50. It is assumed that the data jointly has a Multivariate Normal distribution. The structure is shown below:
+
+```{r}
+#Data
+nutrient <- read.csv("nutrient.csv")
+nutrientRec = c(1000, 15, 60, 800, 75)
+
+#Show data structure
+nutrient[1:6,]
+```
+
+Furthermore, the means of each vitamin within our observations are shown in the table below.
+
+| **Vitamin** 	| **Mean Observed Intake** 	|
+|-------------	|------------------------------	|
+| Calcium     	|           624 mg            |
+| Iron        	|           11 mg               |
+| Protein     	|           66 g              	|
+| Vitamin A   	|           840 $\mu$g        	|
+| Vitamin C   	|           75 mg             	|
+
+\newpage
+
+## Hotelling's $T^2$ test
+
+The statistical test for this data would be a test for a specific distribution, in this case a one-sample Hotelling's $T^2$ test. The conditions for this test are:
+
+*   Independent Random Sample
+
+*   Multivariate Normality
+
+It is already known that the sample is random and comes from the multivariate normal distribution, so all conditions of the test are met.
+
+Since the variables come from a multivariate normal distribution, it can be assumed that each variable is independent, and thus 5 univariate t-tests could be used. However, this would lead to a family wide error rate of 23%, per the FWER formula:
+
+$$1-(1-\alpha)^q \implies 1-(1-0.05)^5 = 0.226$$
+
+The $T^2$ statistic is computed using the following formula:
+
+$$T^2 = n(\bar x - \mu_0)^T S^{-1}(\bar x - \mu_0)$$
+Note, however, that $T^2$ itself is not the test statistic, but rather is used to calculate it.
+
+## Hypothesis and Variables
+
+$H_0: \mu = \mu_0~~~~~H_a: \mu \ne \mu_0$
+
+Where $n$ = number of observations, $\bar x$ = observed mean intake by vitamin, $\mu_0$ = recommended intake by vitamin, $S$ = covariance matrix between vitamins, and $q$ = number of vitamins.
+
+We can reject $H_0$ when $\frac{(n-q)T^2}{nq-q}>F_{.05,q,n-q}$, and our p-value is obtained from the cumulative density of the $F$ distribution at the point of our test statistic.
+
+Our null hypothesis states that the population mean of women in the US meet all the recommended vitamin intake levels, and our alternative hypothesis states that they do not. For this test, we will be using an $\alpha$ level of 0.05.
+
+```{r, message=F}
+#T2 test
+n = 737
+xbar = colMeans(nutrient)
+q = 5
+S = cov(nutrient)
+mu0 = nutrientRec
+
+T2 = n * t(xbar - mu0) %*% solve(S) %*% (xbar - mu0)
+
+teststat = (((n - q)*T2) / ((n-1)*q))
+fstat = qf(.95,q,n-q)
+
+pvalue = 1-pf(teststat, q, n-q)
+
+# cat("\nT2 =", T2,
+#     "\nTest Stat =", teststat,
+#     "\nF Stat =", fstat,
+#     "\nPvalue =", pvalue)
+
+```
+
+
+Plugging in our variables, we obtain the following:
+
+$$n = 737 ~~~~ q=5$$
+
+$$\bar x = \begin{bmatrix}624.05 \\ 11.13 \\ 65.80 \\ 839.64 \\ 78.93 \end{bmatrix}
+~~\mu_0 = \begin{bmatrix}1000 \\ 15 \\ 60 \\ 800 \\ 75 \end{bmatrix}$$
+
+```{r}
+print("S inverse:")
+round(solve(S),2)
+```
+
+\newpage
+
+## Calculations and Results
+
+Now we can plug these variables into the $T^2$ equation:
+
+$$T^2 = n(\bar x - \mu_0)^T S^{-1}(\bar x - \mu_0)$$
+
+$$\implies T^2 = 737 \left( \begin{bmatrix}624.05 \\ 11.13 \\ 65.80 \\ 839.64 \\ 78.93 \end{bmatrix}
+-\begin{bmatrix}1000 \\ 15 \\ 60 \\ 800 \\ 75 \end{bmatrix} \right) ^T 
+\begin{bmatrix} 0&0&0&0&0\\ 0&0.05&-0.01&0&0 \\ 0&-0.01&0&0&0 \\ 0&0&0&0&0 \\ 0&0&0&0&0 \end{bmatrix}
+\left(\begin{bmatrix}624.05 \\ 11.13 \\ 65.80 \\ 839.64 \\ 78.93 \end{bmatrix}
+-\begin{bmatrix}1000 \\ 15 \\ 60 \\ 800 \\ 75 \end{bmatrix} \right)$$
+
+$$\implies T^2 = 737 \begin{bmatrix} -375.95 &  -3.87 & 5.80 & 39.64 & 3.93\end{bmatrix} \begin{bmatrix} 0&0&0&0&0\\ 0&0.05&-0.01&0&0 \\ 0&-0.01&0&0&0 \\ 0&0&0&0&0 \\ 0&0&0&0&0 \end{bmatrix} \begin{bmatrix} -375.95 \\  -3.87 \\ 5.80 \\ 39.64 \\ 3.93 \end{bmatrix}$$
+
+$$\implies T^2 = \begin{bmatrix} -277075.70 &  -2852.26 & 4277.14 & 29211.25 & 2895.27\end{bmatrix} \begin{bmatrix} 0&0&0&0&0\\ 0&0.05&-0.01&0&0 \\ 0&-0.01&0&0&0 \\ 0&0&0&0&0 \\ 0&0&0&0&0 \end{bmatrix} \begin{bmatrix} -375.95 \\  -3.87 \\ 5.80 \\ 39.64 \\ 3.93 \end{bmatrix}$$
+
+$$\implies T^2 = \begin{bmatrix} -2.49 &  -152.94 & 36.58 & 0.11 & 3.82\end{bmatrix}  \begin{bmatrix} -375.95 \\  -3.87 \\ 5.80 \\ 39.64 \\ 3.93 \end{bmatrix}$$
+
+$$\implies T^2 = 1758.54$$
+
+Next, we can compute the test statistic and critical value.
+
+$$\frac{T^2(n-q)}{qn-q} = \frac{1758.54(737-5)}{5(737)-5} = \frac{1287251}{3680} = 349.80$$
+
+$$F_{.05,5,732} = 2.23$$
+
+Since 349.80 is much larger than 2.23, our Pvalue comes out to around 0 and we can reject $H_0$.
+
+Therefore, we have significant evidence that the population mean nutrient intake($\mu$) is not the same as the recommended intake($\mu_0$) at 95% confidence.
+
